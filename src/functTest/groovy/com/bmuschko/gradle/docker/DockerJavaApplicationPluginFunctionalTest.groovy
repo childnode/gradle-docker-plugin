@@ -217,6 +217,87 @@ ADD file2.txt /other/dir/file2.txt
         result.output.contains('Author           : Benjamin Muschko "benjamin.muschko@gmail.com"')
     }
 
+    def "Can clean files - cleanDockerCopyDistResources"() {
+        temporaryFolder.newFile('file1.txt')
+        temporaryFolder.newFile('file2.txt')
+        createJettyMainClass()
+        writeBasicSetupToBuildFile()
+
+        buildFile << """
+            dockerCopyDistResources {
+                from file('file1.txt')
+                from file('file2.txt')
+            }
+
+            dockerDistTar {
+                addFile 'file1.txt', '/some/dir/file1.txt'
+                addFile 'file2.txt', '/other/dir/file2.txt'
+            }
+
+            docker {
+                javaApplication {
+                    baseImage = '$CUSTOM_BASE_IMAGE'
+                    maintainer = 'Benjamin Muschko "benjamin.muschko@gmail.com"'
+                    port = 9090
+                    tag = 'jettyapp:1.115'
+                }
+            }
+        """
+
+        when:
+        build('dockerCopyDistResources')
+
+        then:
+        new File(projectDir, 'build/docker/Dockerfile').exists()
+        new File(projectDir, 'build/docker/file1.txt').exists()
+        new File(projectDir, 'build/docker/file2.txt').exists()
+
+        when:
+        BuildResult result = build('cleanDockerCopyDistResources')
+
+        then:
+        !new File(projectDir, 'build/docker/Dockerfile').exists()
+        !new File(projectDir, 'build/docker/file1.txt').exists()
+        !new File(projectDir, 'build/docker/file2.txt').exists()
+    }
+
+    def "Can clean files - cleanDockerDistTar"() {
+        temporaryFolder.newFile('file1.txt')
+        temporaryFolder.newFile('file2.txt')
+        createJettyMainClass()
+        writeBasicSetupToBuildFile()
+
+        buildFile << """
+            dockerCopyDistResources {
+                from file('file1.txt')
+                from file('file2.txt')
+            }
+
+            dockerDistTar {
+                addFile 'file1.txt', '/some/dir/file1.txt'
+                addFile 'file2.txt', '/other/dir/file2.txt'
+            }
+
+            docker {
+                javaApplication {
+                    baseImage = '$CUSTOM_BASE_IMAGE'
+                    maintainer = 'Benjamin Muschko "benjamin.muschko@gmail.com"'
+                    port = 9090
+                    tag = 'jettyapp:1.115'
+                }
+            }
+        """
+
+        when:
+        build('dockerDistTar')
+        BuildResult result = build('cleanDockerDistTar')
+
+        then:
+        !new File(projectDir, 'build/docker/Dockerfile').exists()
+        !new File(projectDir, 'build/docker/file1.txt').exists()
+        !new File(projectDir, 'build/docker/file2.txt').exists()
+    }
+
     @Requires({ TestPrecondition.DOCKERHUB_CREDENTIALS_AVAILABLE })
     def "Can create image for Java application and push to DockerHub"() {
         createJettyMainClass()

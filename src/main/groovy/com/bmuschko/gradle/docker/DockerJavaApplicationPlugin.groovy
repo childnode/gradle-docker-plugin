@@ -17,14 +17,15 @@ package com.bmuschko.gradle.docker
 
 import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 import com.bmuschko.gradle.docker.tasks.image.DockerPushImage
+import com.bmuschko.gradle.docker.tasks.image.DockerRemoveImage
 import com.bmuschko.gradle.docker.tasks.image.Dockerfile
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.plugins.ApplicationPlugin
 import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.bundling.Tar
 import org.gradle.util.ConfigureUtil
-
 /**
  * Opinionated Gradle plugin for creating and pushing a Docker image for a Java application.
  */
@@ -47,8 +48,10 @@ class DockerJavaApplicationPlugin implements Plugin<Project> {
                 entryPoint { determineEntryPoint(project, tarTask) }
             }
             Dockerfile createDockerfileTask = createDockerfileTask(project, tarTask, dockerJavaApplication)
+            createDockerfileCleanTask(project)
             Copy copyTarTask = createDistCopyResourcesTask(project, tarTask, createDockerfileTask)
             createDockerfileTask.dependsOn copyTarTask
+            createDistCopyResourceCleanTask(project)
             DockerBuildImage dockerBuildImageTask = createBuildImageTask(project, createDockerfileTask, dockerJavaApplication)
             createPushImageTask(project, dockerBuildImageTask)
         }
@@ -92,12 +95,38 @@ class DockerJavaApplicationPlugin implements Plugin<Project> {
         }
     }
 
+    private Delete createDockerfileCleanTask(Project project) {
+        project.afterEvaluate {
+            return project.getTasksByName("clean" + DOCKERFILE_TASK_NAME.capitalize()) {
+                project.getTasksByName(DOCKERFILE_TASK_NAME, false).dependsOn.each {
+                    dependsOn "clean" + it.name.capitalize()
+                }
+            }
+        }
+    }
+
+    private Delete createDistCopyResourceCleanTask(Project project) {
+        project.afterEvaluate {
+            return project.getTasksByName("clean" + COPY_DIST_RESOURCES_TASK_NAME.capitalize()) {
+                project.getTasksByName(COPY_DIST_RESOURCES_TASK_NAME, false).dependsOn.each {
+                    dependsOn "clean" + it.name.capitalize()
+                }
+            }
+        }
+    }
+
     private String determineEntryPoint(Project project, Tar tarTask) {
         String installDir = tarTask.archiveName - ".${tarTask.extension}"
         "/$installDir/bin/$project.applicationName".toString()
     }
 
     private DockerBuildImage createBuildImageTask(Project project, Dockerfile createDockerfileTask, DockerJavaApplication dockerJavaApplication) {
+        project.task("clean" + BUILD_IMAGE_TASK_NAME.capitalize(), type: DockerRemoveImage) {
+            conventionMapping.imageId = {
+                project.tasks.getByName(BUILD_IMAGE_TASK_NAME).getTag()
+            }
+        }
+
         project.task(BUILD_IMAGE_TASK_NAME, type: DockerBuildImage) {
             description = 'Builds the Docker image for the Java application.'
             dependsOn createDockerfileTask
