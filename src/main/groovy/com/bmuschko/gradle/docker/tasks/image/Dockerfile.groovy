@@ -119,9 +119,30 @@ class Dockerfile extends DefaultTask {
      * The <a href="https://docs.docker.com/reference/builder/#arg">ARG instruction</a> defines a variable that
      * users can pass at build-time to the builder.
      *
-     * @param arg Argument to pass, possibly with default value.
+     * @param arg Argument to pass, possibly with default value as a String, you have to write your own = sign for and defaultValues.
+     * @see {@link Dockerfile::arg(String, String)}
      */
     void arg(String arg) {
+        instructions << new ArgInstruction(arg)
+    }
+
+    /**
+     * The <a href="https://docs.docker.com/reference/builder/#arg">ARG instruction</a> defines a variable that
+     * users can pass at build-time to the builder.
+     *
+     * @param arg Argument to pass, possibly with default value as key, value pair.
+     */
+    void arg(String arg, String defaultValue) {
+        instructions << new ArgInstruction(arg, defaultValue)
+    }
+
+    /**
+     * The <a href="https://docs.docker.com/reference/builder/#arg">ARG instruction</a> defines a variable that
+     * users can pass at build-time to the builder.
+     *
+     * @param arg Argument to pass, possibly with default value either as String, Map<key,value> or String... .
+     */
+    void arg(Closure arg) {
         instructions << new ArgInstruction(arg)
     }
 
@@ -517,14 +538,21 @@ class Dockerfile extends DefaultTask {
     }
 
     static class SingleItemJoiner implements ItemJoiner {
+        String seperator
+
+        SingleItemJoiner(String seperator = '') {
+            this.seperator = seperator
+        }
+
         @Override
         String join(Map<String, String> map) {
             map.inject([]) { result, entry ->
                 def key   = ItemJoinerUtil.isUnquotedStringWithWhitespaces(entry.key)   ? ItemJoinerUtil.toQuotedString(entry.key)   : entry.key
                 // preserve multiline value in a single item key value instruction but ignore any other whitespaces or quotings
-                def value = entry.value.replaceAll("(\r)*\n", "\\\\\n")
+                def value = entry.value ?: ''
+                value.replaceAll("(\r)*\n", "\\\\\n")
                 result << "$key $value"
-            }.join('')
+            }.join(seperator)
         }
     }
 
@@ -625,9 +653,13 @@ class Dockerfile extends DefaultTask {
         }
     }
 
-    static class ArgInstruction extends StringCommandInstruction {
+    static class ArgInstruction extends MapInstruction {
         ArgInstruction(String arg) {
-            super(arg)
+            this(arg, null)
+        }
+
+        ArgInstruction(String arg, String defaultValue) {
+            super([(arg): defaultValue], new SingleItemJoiner('='))
         }
 
         ArgInstruction(Closure arg) {

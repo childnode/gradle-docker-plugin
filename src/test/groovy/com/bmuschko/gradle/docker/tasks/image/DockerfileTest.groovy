@@ -94,5 +94,12 @@ with linebreaks in between\""
         new LabelInstruction({ ['long': '''Multiple lines labels 
 with linebreaks in between''' ] })                                                      | 'LABEL'         | "LABEL long=\"Multiple lines labels \\\n\
 with linebreaks in between\""
+        new ArgInstruction("key")                                                       | 'ARG'           | "ARG key"
+        new ArgInstruction("key=value")                                                 | 'ARG'           | "ARG key=value"
+        new ArgInstruction("key=\"value\"")                                             | 'ARG'           | "ARG key=\"value\""
+        new ArgInstruction("key", "value")                                              | 'ARG'           | "ARG key=\"value\""
+        new ArgInstruction({"key=value"})                                               | 'ARG'           | "ARG key=value"
+        new ArgInstruction({["key", "value"]})                                          | 'ARG'           | "ARG key=\"value\""
+        new ArgInstruction({["key": "value", "key2": "value"]})                         | 'ARG'           | "ARG key=\"value\""
     }
 }
